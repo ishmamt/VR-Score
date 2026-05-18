@@ -1,0 +1,117 @@
+# VR-Score Dataset Run Configuration
+# ------------------------------------
+# Copy this file, edit the paths, and run:
+#
+#   python run_dataset.py --config run_config.toml
+#
+# Every key has a default; a minimal config only needs [dataset] directory.
+
+
+# ---------------------------------------------------------------------------
+# [dataset]  — where your videos live
+# ---------------------------------------------------------------------------
+[dataset]
+
+# Root folder whose immediate sub-directories are source-model folders.
+# Each sub-directory name becomes the "source_model" label in the output.
+#
+# Expected layout:
+#   dataset/
+#   ├── Sora/
+#   │   └── clip_001.mp4
+#   ├── Sora2/
+#   │   └── clip_002.mp4
+#   └── Kling/
+#       └── clip_003.mp4
+directory = "/path/to/dataset"
+
+# File extensions that are treated as video files (case-insensitive).
+# Default covers the most common formats; add or remove as needed.
+video_extensions = [".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v"]
+
+
+# ---------------------------------------------------------------------------
+# [output]  — where results are saved
+# ---------------------------------------------------------------------------
+[output]
+
+# Directory that will receive the output file.  Created automatically.
+directory = "results"
+
+# Base filename (no extension).  The extension is appended automatically.
+filename = "vr_scores"
+
+# Output format:
+#   "csv"   — one row per video, appended incrementally.
+#             Easiest for Excel / pandas analysis.
+#   "jsonl" — one JSON object per line, appended incrementally.
+#             Convert to a standard JSON array with:
+#               python scripts/jsonl_to_json.py results/vr_scores.jsonl
+format = "csv"
+
+
+# ---------------------------------------------------------------------------
+# [run]  — execution settings
+# ---------------------------------------------------------------------------
+[run]
+
+# PyTorch device for DINOv2 (M4 latent metric).
+# Options: "cpu", "cuda", "cuda:0", "cuda:1", "mps"
+# Leave empty ("") to auto-detect (CUDA if available, otherwise CPU).
+device = ""
+
+# Path to a calibration JSON file produced by MetricNormalizer.save().
+# Leave empty ("") to use the built-in heuristic defaults.
+calibration = ""
+
+# When true, videos whose filename already appears in the output file with
+# status "ok" are skipped.  Videos that previously failed are always retried.
+resume = true
+
+# Logging verbosity: "DEBUG", "INFO", "WARNING", "ERROR"
+log_level = "INFO"
+
+
+# ---------------------------------------------------------------------------
+# [scorer.*]  — VR-Score algorithm hyper-parameters
+# Defaults are research-validated; only change if you have a reason to.
+# ---------------------------------------------------------------------------
+
+[scorer.sampling]
+# Frames sampled uniformly across the whole video (M1 spatial, M3 noise).
+spatial_frames = 8
+noise_frames   = 8
+
+# Consecutive frames from the video start for optical flow (M2 temporal).
+# Minimum 48 recommended for a stable jitter estimate.
+temporal_frames = 60
+
+# Frames from a central time window for DINOv2 trajectory (M4 latent).
+# Mirrors the ReStraV protocol: 24 frames over a 2-second window.
+latent_frames          = 24
+latent_window_seconds  = 2.0
+
+[scorer.wavelet]
+# Daubechies-4 offers good frequency localisation with compact support.
+wavelet           = "db4"
+decomposition_level = 2
+
+[scorer.optical_flow]
+# Farneback dense optical flow parameters.
+pyr_scale        = 0.5
+levels           = 3
+winsize          = 15
+iterations       = 3
+poly_n           = 5
+poly_sigma       = 1.2
+# Pixels below this flow-magnitude percentile are treated as "background".
+static_percentile = 50.0
+
+[scorer.weights]
+# Composite weights.  Must all be positive; they are not required to sum to 1
+# (they are normalised internally).  M4 (latent) carries the most weight
+# because ReStraV achieves the highest standalone detection accuracy.
+spatial  = 0.20
+temporal = 0.20
+noise    = 0.20
+latent   = 0.40
